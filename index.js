@@ -27,13 +27,13 @@ function lerClientes(){
 } 
 
 function salvarClientes(clientes){
-  fs.whiteFileSync(clientesFile, JSON.stringify(clientes, null, 2), 'utf-8');
+  fs.writeFileSync(clientesFile, JSON.stringify(clientes, null, 2), 'utf-8');
 }
 
 app.post('/clientes', (req, res) => {
-    const {cpf, nome, idade, endereco, birro, contato} = req.body;
+    const {cpf, nome, idade, endereco, bairro, contato} = req.body;
 
-if (!cpf || !nome || !idade || !endereco || !birro || !contato) {
+if (!cpf || !nome || !idade || !endereco || !bairro || !contato) {
     return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
 }
 
