@@ -52,6 +52,14 @@ if (!cpf || !nome || !idade || !endereco || !bairro || !contato) {
 });
 
 
+
+app.get("/clientes", (req, res) => {
+    const clientes = lerClientes();
+    res.status(200).json(clientes);
+});
+    
+
+    
 app.listen(port, () => {
     console.log(`Servidor rodando em http://localhost:${port}`);
 });
