@@ -1,12 +1,5 @@
 [
-  {
-    "cpf": "",
-    "nome": "",
-    "idade": "",
-    "endereco": "",
-    "bairro": "",
-    "contato": ""
-  },
+  
   {
     "cpf": "123",
     "nome": "duda",
