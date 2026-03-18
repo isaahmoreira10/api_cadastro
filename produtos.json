@@ -4,5 +4,11 @@
     "nome": "Celular",
     "preco": 1500,
     "estoque": 10
+  },
+  {
+    "id": "1071",
+    "nome": "Celular 2",
+    "preco": 1500,
+    "estoque": 10
   }
 ]

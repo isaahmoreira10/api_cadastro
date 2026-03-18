@@ -5,7 +5,36 @@ const path = require('path');
 const app = express();
 const port = 3000;
 
-app.use(express.json());
+// Middleware de JSON parsing apenas para métodos que usam corpo
+app.use((req, res, next) => {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        express.json()(req, res, next);
+    } else {
+        next();
+    }
+});
+
+// Middleware de log para todas as requisições
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url} - Content-Type: ${req.headers['content-type'] || 'undefined'}`);
+    next();
+});
+
+// Middleware para tratar erros de JSON parsing
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        console.error('Erro de JSON:', {
+            method: req.method,
+            url: req.url,
+            headers: req.headers,
+            body: req.body
+        });
+        return res.status(400).json({ 
+            error: 'JSON inválido. Verifique o formato do corpo da requisição.' 
+        });
+    }
+    next(err);
+});
 
 // --- CONFIGURAÇÃO DE CAMINHOS ---
 const BANCO_DADOS = {
@@ -47,6 +76,11 @@ app.get('/clientes', (req, res) => {
 });
 
 app.post('/clientes', (req, res) => {
+    // Verifica se o corpo da requisição está vazio
+    if (!req.body || Object.keys(req.body).length === 0) {
+        return res.status(400).json({ error: 'Corpo da requisição vazio. Envie os dados do cliente.' });
+    }
+
     const { cpf, nome, idade, endereco, bairro, contato } = req.body;
 
     if (!cpf || !nome || !idade) {
@@ -75,6 +109,16 @@ app.post('/clientes', (req, res) => {
     }
 });
 
+// Busca cliente individual por CPF
+app.get('/clientes/:cpf', (req, res) => {
+    const clientes = lerDados('clientes');
+    const cliente = clientes.find(c => String(c.cpf) === String(req.params.cpf));
+    
+    if (!cliente) return res.status(404).json({ error: 'Cliente não encontrado' });
+    res.json(cliente);
+});
+
+
 // --- ROTAS DE PRODUTOS ---
 
 app.get('/produtos', (req, res) => {
@@ -82,6 +126,11 @@ app.get('/produtos', (req, res) => {
 });
 
 app.post('/produtos', (req, res) => {
+    // Verifica se o corpo da requisição está vazio
+    if (!req.body || Object.keys(req.body).length === 0) {
+        return res.status(400).json({ error: 'Corpo da requisição vazio. Envie os dados do produto.' });
+    }
+
     const { id, nome, preco, estoque } = req.body;
 
     if (!id || !nome || !preco) {
