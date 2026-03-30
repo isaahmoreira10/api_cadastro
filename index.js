@@ -1,174 +1,113 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
+const express = require('express'); 
+const fs = require('fs'); 
+const path = require('path'); 
+const cors = require('cors'); 
 
 const app = express();
 const port = 3000;
+app.use(cors());
+app.use(express.json());
 
-// Middleware de JSON parsing apenas para métodos que usam corpo
-app.use((req, res, next) => {
-    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-        express.json()(req, res, next);
-    } else {
-        next();
-    }
-});
+// --- CONFIGURAÇÃO DE ARQUIVOS ---
+const clientesFiles = path.join(__dirname, 'clientes.json');
+const usuariosFiles = path.join(__dirname, 'usuarios.json'); // Caminho para usuários
 
-// Middleware de log para todas as requisições
-app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url} - Content-Type: ${req.headers['content-type'] || 'undefined'}`);
-    next();
-});
-
-// Middleware para tratar erros de JSON parsing
-app.use((err, req, res, next) => {
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        console.error('Erro de JSON:', {
-            method: req.method,
-            url: req.url,
-            headers: req.headers,
-            body: req.body
-        });
-        return res.status(400).json({ 
-            error: 'JSON inválido. Verifique o formato do corpo da requisição.' 
-        });
-    }
-    next(err);
-});
-
-// --- CONFIGURAÇÃO DE CAMINHOS ---
-const BANCO_DADOS = {
-    clientes: path.join(__dirname, 'clientes.json'),
-    produtos: path.join(__dirname, 'produtos.json')
-};
-
-// --- FUNÇÕES AUXILIARES UNIVERSAIS ---
-
-// Lê qualquer arquivo JSON baseado na chave (clientes ou produtos)
-function lerDados(tipo) {
-    try {
-        const arquivo = BANCO_DADOS[tipo];
-        if (!fs.existsSync(arquivo)) return [];
-        const dados = fs.readFileSync(arquivo, 'utf8');
-        return JSON.parse(dados || '[]');
-    } catch (e) {
-        console.error(`Erro ao ler ${tipo}:`, e);
-        return [];
-    }
+// --- FUNÇÕES AUXILIARES (CLIENTES) ---
+function lerClientes() {
+    if (!fs.existsSync(clientesFiles)) return [];
+    const dados = fs.readFileSync(clientesFiles, 'utf8');
+    try { return JSON.parse(dados) || []; } catch (e) { return []; }
+}
+function salvarClientes(clientes) {
+    fs.writeFileSync(clientesFiles, JSON.stringify(clientes, null, 2), 'utf-8');
 }
 
-// Salva qualquer array no arquivo correspondente
-function salvarDados(tipo, objeto) {
-    try {
-        const arquivo = BANCO_DADOS[tipo];
-        fs.writeFileSync(arquivo, JSON.stringify(objeto, null, 2), 'utf-8');
-        return true;
-    } catch (e) {
-        console.error(`Erro ao salvar ${tipo}:`, e);
-        return false;
-    }
+// --- FUNÇÕES AUXILIARES (USUÁRIOS) ---
+function lerUsuarios() {
+    if (!fs.existsSync(usuariosFiles)) return [];
+    const dados = fs.readFileSync(usuariosFiles, 'utf8');
+    try { return JSON.parse(dados) || []; } catch (e) { return []; }
+}
+function salvarUsuarios(usuarios) {
+    fs.writeFileSync(usuariosFiles, JSON.stringify(usuarios, null, 2), 'utf-8');
 }
 
-// --- ROTAS DE CLIENTES ---
+/*
+  USUÁRIOS ENDPOINTS
+*/
 
-app.get('/clientes', (req, res) => {
-    res.json(lerDados('clientes'));
+app.post('/usuarios', (req, res) => {
+    const { codigo, nome, email, senha } = req.body;
+
+    // Validação de campos
+    if (!codigo || !nome || !email || !senha) {
+        return res.status(400).json({ error: 'Código, Nome, Email e Senha são obrigatórios' });
+    }
+
+    const usuarios = lerUsuarios();
+
+    // Verifica se o código ou email já existem
+    if (usuarios.some(u => u.codigo === codigo)) {
+        return res.status(400).json({ error: 'Código de usuário já cadastrado' });
+    }
+    if (usuarios.some(u => u.email === email)) {
+        return res.status(400).json({ error: 'Email já cadastrado' });
+    }
+
+    const novoUsuario = { codigo, nome, email, senha };
+
+    usuarios.push(novoUsuario);
+    salvarUsuarios(usuarios);
+
+    res.status(201).json({ 
+        mensagem: 'Usuário cadastrado com sucesso', 
+        usuario: { codigo, nome, email } // Retornamos sem a senha por segurança
+    });
 });
+
+app.get("/usuarios", (req, res) => {
+    const usuarios = lerUsuarios();
+    // Mapeamos para não enviar a senha no GET geral
+    const listaSegura = usuarios.map(({ senha, ...resto }) => resto);
+    res.status(200).json(listaSegura);
+});
+
+/*
+  CLIENTES ENDPOINTS (Mantidos)
+*/
 
 app.post('/clientes', (req, res) => {
-    // Verifica se o corpo da requisição está vazio
-    if (!req.body || Object.keys(req.body).length === 0) {
-        return res.status(400).json({ error: 'Corpo da requisição vazio. Envie os dados do cliente.' });
-    }
-
     const { cpf, nome, idade, endereco, bairro, contato } = req.body;
-
-    if (!cpf || !nome || !idade) {
-        return res.status(400).json({ error: 'Dados essenciais faltando (CPF, Nome, Idade)' });
+    if (!cpf || !nome || !idade || !endereco || !bairro || !contato) {
+        return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
     }
 
-    const clientes = lerDados('clientes');
-    if (clientes.some(c => String(c.cpf) === String(cpf))) {
-        return res.status(400).json({ error: 'Este CPF já está cadastrado.' });
+    const clientes = lerClientes();
+    if (clientes.some(c => c.cpf === cpf)) {
+        return res.status(400).json({ error: 'CPF já cadastrado' });
     }
 
-    const novoCliente = { 
-        cpf: String(cpf), 
-        nome, 
-        idade: Number(idade), 
-        endereco, 
-        bairro, 
-        contato 
-    };
-
+    const novoCliente = { cpf, nome, idade, endereco, bairro, contato };
     clientes.push(novoCliente);
-    if (salvarDados('clientes', clientes)) {
-        res.status(201).json({ mensagem: 'Cliente cadastrado!', cliente: novoCliente });
-    } else {
-        res.status(500).json({ error: 'Erro ao salvar cliente.' });
-    }
+    salvarClientes(clientes);
+    res.status(201).json({ mensagem: 'Cliente cadastrado com sucesso', cliente: novoCliente });
 });
 
-// Busca cliente individual por CPF
-app.get('/clientes/:cpf', (req, res) => {
-    const clientes = lerDados('clientes');
-    const cliente = clientes.find(c => String(c.cpf) === String(req.params.cpf));
-    
-    if (!cliente) return res.status(404).json({ error: 'Cliente não encontrado' });
-    res.json(cliente);
+app.get("/clientes", (req, res) => {
+    const clientes = lerClientes();
+    res.status(200).json(clientes);
 });
 
-
-// --- ROTAS DE PRODUTOS ---
-
-app.get('/produtos', (req, res) => {
-    res.json(lerDados('produtos'));
+app.get("/clientes/:cpf", (req, res) => {
+    const { cpf } = req.params;
+    const clientes = lerClientes();
+    const cliente = clientes.find(c => c.cpf === cpf);
+    if (!cliente) {
+        return res.status(404).json({ error: 'Cliente não encontrado' });
+    }
+    res.status(200).json(cliente);
 });
-
-app.post('/produtos', (req, res) => {
-    // Verifica se o corpo da requisição está vazio
-    if (!req.body || Object.keys(req.body).length === 0) {
-        return res.status(400).json({ error: 'Corpo da requisição vazio. Envie os dados do produto.' });
-    }
-
-    const { id, nome, preco, estoque } = req.body;
-
-    if (!id || !nome || !preco) {
-        return res.status(400).json({ error: 'Dados essenciais faltando (ID, Nome, Preço)' });
-    }
-
-    const produtos = lerDados('produtos');
-    if (produtos.some(p => String(p.id) === String(id))) {
-        return res.status(400).json({ error: 'Este ID de produto já existe.' });
-    }
-
-    const novoProduto = { 
-        id: String(id), 
-        nome, 
-        preco: Number(preco), 
-        estoque: Number(estoque) || 0 
-    };
-
-    produtos.push(novoProduto);
-    if (salvarDados('produtos', produtos)) {
-        res.status(201).json({ mensagem: 'Produto cadastrado!', produto: novoProduto });
-    } else {
-        res.status(500).json({ error: 'Erro ao salvar produto.' });
-    }
-});
-
-// Busca produto individual por ID
-app.get('/produtos/:id', (req, res) => {
-    const produtos = lerDados('produtos');
-    const produto = produtos.find(p => String(p.id) === String(req.params.id));
-    
-    if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
-    res.json(produto);
-});
-
-// --- INICIALIZAÇÃO ---
 
 app.listen(port, () => {
-    console.log(`🚀 Servidor rodando em http://localhost:${port}`);
-    console.log(`📂 Arquivos: ${BANCO_DADOS.clientes} e ${BANCO_DADOS.produtos}`);
-});
+    console.log(`Servidor rodando em http://localhost:${port}`);
+}); 
