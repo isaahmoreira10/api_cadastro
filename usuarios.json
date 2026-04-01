@@ -4,5 +4,17 @@
     "nome": "isabella",
     "email": "isabella@gmail.com",
     "senha": "123"
+  },
+  {
+    "codigo": "1234567",
+    "nome": "isabella 2",
+    "email": "isabella2@gmail.com",
+    "senha": "123"
+  },
+  {
+    "codigo": "12345",
+    "nome": "isabella3",
+    "email": "isabella3@gmail.com",
+    "senha": "123"
   }
 ]
